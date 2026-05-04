@@ -516,7 +516,7 @@
     <div class="form-row">
       <div class="form-group">
         <label>Date</label>
-        <input type="date" id="f-date" oninput="checkDuplicate()">
+        <input type="date" id="f-date" oninput="checkDuplicate()" onchange="checkDuplicate()">
       </div>
       <div class="form-group">
         <label>Channel</label>
@@ -531,11 +531,11 @@
     <div class="form-row three">
       <div class="form-group">
         <label>From</label>
-        <input type="time" id="f-from" oninput="checkDuplicate()">
+        <input type="time" id="f-from" oninput="checkDuplicate()" onchange="checkDuplicate()">
       </div>
       <div class="form-group">
         <label>To</label>
-        <input type="time" id="f-to" oninput="checkDuplicate()">
+        <input type="time" id="f-to" oninput="checkDuplicate()" onchange="checkDuplicate()">
       </div>
       <div class="form-group">
         <label>Location</label>
@@ -1017,6 +1017,14 @@ function saveShoot() {
     updatedAt: Date.now()
   };
   if(!data.date || !data.person) { alert('Date and Person / Project are required.'); return; }
+
+  // block on overlap
+  const overlaps = getOverlaps(data.date, data.from, data.to, editingId);
+  if(overlaps.length) {
+    const names = overlaps.map(s=>`${s.person} (${s.from}–${s.to})`).join(', ');
+    const ok = confirm(`Time overlap with: ${names}\n\nThe camera may not be available. Save anyway?`);
+    if(!ok) return;
+  }
 
   if(editingId) {
     SHOOTS_REF.child(editingId).update(data);
