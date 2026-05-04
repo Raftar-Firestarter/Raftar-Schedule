@@ -531,11 +531,11 @@
     <div class="form-row three">
       <div class="form-group">
         <label>From</label>
-        <input type="time" id="f-from">
+        <input type="time" id="f-from" oninput="checkDuplicate()">
       </div>
       <div class="form-group">
         <label>To</label>
-        <input type="time" id="f-to">
+        <input type="time" id="f-to" oninput="checkDuplicate()">
       </div>
       <div class="form-group">
         <label>Location</label>
@@ -954,16 +954,53 @@ function openFormOnDate(dateStr, hour=null) {
   openForm(null, dateStr, hour);
 }
 
+function timesToMins(t) {
+  if(!t) return null;
+  const [h,m] = t.split(':').map(Number);
+  return h*60+m;
+}
+
+function getOverlaps(date, from, to, excludeId) {
+  if(!date) return [];
+  const fMins = timesToMins(from);
+  const tMins = timesToMins(to);
+  return Object.entries(shoots).filter(([id,s]) => {
+    if(id === excludeId) return false;
+    if(s.date !== date) return false;
+    if(s.status === 'Cancelled') return false;
+    if(!fMins || !tMins || !s.from || !s.to) return false;
+    const sMins = timesToMins(s.from);
+    const eMins = timesToMins(s.to);
+    return fMins < eMins && tMins > sMins;
+  }).map(([,s]) => s);
+}
+
 function checkDuplicate() {
   const date   = document.getElementById('f-date').value;
   const person = document.getElementById('f-person').value.trim().toLowerCase();
-  if(!date || !person) { document.getElementById('dup-warning').style.display='none'; return; }
-  const dup = Object.entries(shoots).some(([id,s]) =>
-    s.date===date &&
-    (s.person||'').toLowerCase()===person &&
-    id !== editingId
+  const from   = document.getElementById('f-from').value;
+  const to     = document.getElementById('f-to').value;
+
+  const warn = document.getElementById('dup-warning');
+
+  // exact duplicate check
+  const dup = date && person && Object.entries(shoots).some(([id,s]) =>
+    s.date===date && (s.person||'').toLowerCase()===person && id!==editingId
   );
-  document.getElementById('dup-warning').style.display = dup ? 'block' : 'none';
+  if(dup) {
+    warn.textContent = '⚠ A shoot with this date and person already exists — check before saving.';
+    warn.style.display = 'block'; return;
+  }
+
+  // time overlap check
+  const overlaps = getOverlaps(date, from, to, editingId);
+  if(overlaps.length) {
+    const names = overlaps.map(s=>`${s.person} (${s.from}–${s.to})`).join(', ');
+    warn.textContent = `⚠ Time overlap with: ${names} — camera may not be available.`;
+    warn.style.display = 'block'; return;
+  }
+
+  warn.style.display = 'none';
 }
 
 function saveShoot() {
