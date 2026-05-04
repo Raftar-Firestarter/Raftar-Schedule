@@ -734,22 +734,23 @@ function renderWeek() {
         .map(([id,s]) => ({id,...s}));
 
       let cellContent = '';
-      dayShots.forEach(s => {
-        const sh = s.from ? parseInt(s.from.split(':')[0]) : null;
-        if (sh === h) {
-          const col = CH_COLOR[s.channel] || '#64748B';
-          const dur = getDurPx(s.from, s.to);
-          cellContent += `<div onclick="showDetail('${s.id}')" style="
-            position:absolute;left:3px;right:3px;
-            background:${col}22;border-left:3px solid ${col};
-            border-radius:4px;padding:3px 6px;font-size:11px;
-            cursor:pointer;z-index:2;height:${dur}px;min-height:20px;overflow:hidden;
-            top:0;
-          " title="${s.person}">
-            <div style="font-weight:500;color:${col};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.person||''}</div>
-            ${s.from?`<div style="color:var(--muted)">${s.from}${s.to?'–'+s.to:''}</div>`:''}
-          </div>`;
-        }
+      const slotShots = dayShots.filter(s => s.from && parseInt(s.from.split(':')[0]) === h);
+      const total = slotShots.length;
+      slotShots.forEach((s, idx) => {
+        const col = CH_COLOR[s.channel] || '#64748B';
+        const dur = getDurPx(s.from, s.to);
+        const w = total > 1 ? `calc(${100/total}% - 4px)` : 'calc(100% - 6px)';
+        const left = total > 1 ? `calc(${idx * 100/total}% + 2px)` : '3px';
+        cellContent += `<div onclick="showDetail('${s.id}')" style="
+          position:absolute;left:${left};width:${w};
+          background:${col}22;border-left:3px solid ${col};
+          border-radius:4px;padding:3px 5px;font-size:11px;
+          cursor:pointer;z-index:2;height:${dur}px;min-height:20px;overflow:hidden;
+          top:0;
+        " title="${s.person}">
+          <div style="font-weight:500;color:${col};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.person||''}</div>
+          ${s.from?`<div style="color:var(--muted);font-size:10px">${s.from}${s.to?'–'+s.to:''}</div>`:''}
+        </div>`;
       });
 
       html += `<div class="week-cell" onclick="openFormOnDate('${dateStr}',${h})">${cellContent}</div>`;
