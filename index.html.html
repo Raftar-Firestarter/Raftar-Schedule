@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Raftar — Shoot Schedule</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0F1117;
+    --surface:   #181B24;
+    --card:      #1E2230;
+    --border:    #2A2F3E;
+    --accent:    #F59E0B;
+    --accent2:   #3B82F6;
+    --text:      #F1F5F9;
+    --muted:     #64748B;
+    --subtle:    #94A3B8;
+
+    --raftar:        #3B82F6;
+    --raftar-bg:     #1E3A5F;
+    --sports:        #F59E0B;
+    --sports-bg:     #3D2E0A;
+    --cuts:          #10B981;
+    --cuts-bg:       #0D3327;
+    --now:           #8B5CF6;
+    --now-bg:        #2D1F5E;
+    --momkast:       #EC4899;
+    --momkast-bg:    #4A1535;
+    --fire:          #EF4444;
+    --fire-bg:       #3B1212;
+
+    --confirmed:  #10B981;
+    --tentative:  #F59E0B;
+    --cancelled:  #EF4444;
+
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+  }
+
+  /* ── AUTH ── */
+  #auth-screen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+  }
+  .auth-box {
+    width: 340px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2.5rem;
+    text-align: center;
+  }
+  .auth-logo {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .12em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 1.5rem;
+  }
+  .auth-box h2 { font-size: 20px; font-weight: 500; margin-bottom: .4rem; }
+  .auth-box p  { font-size: 13px; color: var(--muted); margin-bottom: 1.8rem; }
+  .auth-box input {
+    width: 100%; padding: 10px 14px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); color: var(--text);
+    font-family: 'DM Mono', monospace; font-size: 14px;
+    text-align: center; margin-bottom: 12px;
+    outline: none; transition: border-color .2s;
+  }
+  .auth-box input:focus { border-color: var(--accent); }
+  .auth-box button {
+    width: 100%; padding: 11px;
+    background: var(--accent); border: none;
+    border-radius: var(--radius-sm); color: #000;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 600; font-size: 14px;
+    cursor: pointer; transition: opacity .15s;
+  }
+  .auth-box button:hover { opacity: .88; }
+  .auth-error { color: var(--cancelled); font-size: 12px; margin-top: 8px; display: none; }
+
+  /* ── LAYOUT ── */
+  #app { display: none; flex-direction: column; min-height: 100vh; }
+
+  header {
+    display: flex; align-items: center; gap: 16px;
+    padding: 0 24px; height: 56px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo { font-size: 12px; font-weight: 600; letter-spacing: .12em; color: var(--accent); text-transform: uppercase; }
+  .logo span { color: var(--muted); font-weight: 400; }
+  nav { display: flex; gap: 4px; margin-left: auto; }
+  nav button {
+    padding: 6px 14px; border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    background: transparent; color: var(--muted);
+    font-family: 'DM Sans', sans-serif; font-size: 13px;
+    cursor: pointer; transition: all .15s;
+  }
+  nav button:hover { color: var(--text); background: var(--card); }
+  nav button.active { background: var(--card); border-color: var(--border); color: var(--text); }
+  .btn-new {
+    margin-left: 8px;
+    padding: 7px 16px;
+    background: var(--accent); border: none;
+    border-radius: var(--radius-sm); color: #000;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 600; font-size: 13px;
+    cursor: pointer; transition: opacity .15s;
+  }
+  .btn-new:hover { opacity: .88; }
+
+  main { flex: 1; padding: 24px; max-width: 1400px; margin: 0 auto; width: 100%; }
+
+  /* ── VIEWS ── */
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* ── CALENDAR ── */
+  .cal-header {
+    display: flex; align-items: center; gap: 16px; margin-bottom: 20px;
+  }
+  .cal-nav { display: flex; gap: 6px; }
+  .cal-nav button {
+    width: 32px; height: 32px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); color: var(--text);
+    font-size: 16px; cursor: pointer; transition: background .15s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .cal-nav button:hover { background: var(--border); }
+  .cal-title { font-size: 18px; font-weight: 500; }
+  .cal-mode { display: flex; gap: 4px; margin-left: auto; }
+  .cal-mode button {
+    padding: 5px 12px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: transparent; color: var(--muted);
+    font-family: 'DM Sans', sans-serif; font-size: 12px; cursor: pointer;
+  }
+  .cal-mode button.active { background: var(--card); color: var(--text); }
+
+  /* WEEK VIEW */
+  .week-grid {
+    display: grid;
+    grid-template-columns: 60px repeat(7, 1fr);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .week-day-header {
+    padding: 12px 8px; text-align: center;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px; font-weight: 500;
+  }
+  .week-day-header.today { color: var(--accent); }
+  .week-day-header .date-num {
+    display: block; font-size: 20px; font-weight: 300;
+    line-height: 1.2; margin-bottom: 2px;
+  }
+  .week-day-header .day-name { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+  .week-time-col { border-right: 1px solid var(--border); }
+  .week-time-slot {
+    height: 60px; display: flex; align-items: flex-start;
+    justify-content: flex-end; padding: 4px 8px 0 0;
+    font-size: 11px; color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    border-bottom: 1px solid var(--border);
+  }
+  .week-cell {
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    min-height: 60px; position: relative;
+    cursor: pointer; transition: background .1s;
+  }
+  .week-cell:hover { background: rgba(255,255,255,.02); }
+  .week-cell:last-child { border-right: none; }
+
+  /* MONTH VIEW */
+  .month-grid {
+    display: grid; grid-template-columns: repeat(7,1fr);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden;
+  }
+  .month-day-name {
+    padding: 10px; text-align: center;
+    font-size: 11px; font-weight: 500; text-transform: uppercase;
+    letter-spacing: .06em; color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  .month-cell {
+    min-height: 110px; padding: 8px;
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    cursor: pointer; transition: background .1s;
+  }
+  .month-cell:hover { background: rgba(255,255,255,.02); }
+  .month-cell.other-month { opacity: .3; }
+  .month-cell.today .cell-date {
+    background: var(--accent); color: #000;
+    width: 24px; height: 24px;
+    border-radius: 50%; display: flex;
+    align-items: center; justify-content: center;
+  }
+  .cell-date { font-size: 13px; font-weight: 500; margin-bottom: 6px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
+  .shoot-pill {
+    font-size: 11px; padding: 2px 6px;
+    border-radius: 4px; margin-bottom: 2px;
+    white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; cursor: pointer;
+    transition: opacity .15s;
+  }
+  .shoot-pill:hover { opacity: .8; }
+  .more-pill { font-size: 11px; color: var(--muted); padding: 2px 4px; }
+
+  /* ── LIST VIEW ── */
+  .list-filters {
+    display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;
+  }
+  .filter-select {
+    padding: 7px 12px; background: var(--card);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    color: var(--text); font-family: 'DM Sans', sans-serif;
+    font-size: 13px; cursor: pointer; outline: none;
+  }
+  .filter-select:focus { border-color: var(--accent); }
+  .search-input {
+    flex: 1; min-width: 200px;
+    padding: 7px 14px; background: var(--card);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    color: var(--text); font-family: 'DM Sans', sans-serif;
+    font-size: 13px; outline: none;
+  }
+  .search-input:focus { border-color: var(--accent); }
+  .search-input::placeholder { color: var(--muted); }
+
+  .shoot-table { width: 100%; border-collapse: collapse; }
+  .shoot-table th {
+    text-align: left; padding: 10px 14px;
+    font-size: 11px; font-weight: 500; text-transform: uppercase;
+    letter-spacing: .06em; color: var(--muted);
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    position: sticky; top: 56px;
+  }
+  .shoot-table td {
+    padding: 11px 14px; border-bottom: 1px solid var(--border);
+    font-size: 13px; vertical-align: middle;
+  }
+  .shoot-table tr { background: var(--card); transition: background .1s; cursor: pointer; }
+  .shoot-table tr:hover { background: var(--surface); }
+  .shoot-table tr.past td { opacity: .5; }
+
+  /* ── DASHBOARD ── */
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: 12px; margin-bottom: 24px; }
+  .stat-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px 20px;
+  }
+  .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
+  .stat-value { font-size: 28px; font-weight: 300; line-height: 1; }
+  .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .dash-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px;
+  }
+  .dash-card h3 { font-size: 13px; font-weight: 500; color: var(--muted); margin-bottom: 14px; text-transform: uppercase; letter-spacing: .06em; }
+  .channel-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 0; border-bottom: 1px solid var(--border);
+  }
+  .channel-row:last-child { border-bottom: none; }
+  .ch-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .ch-name { flex: 1; font-size: 13px; }
+  .ch-count { font-size: 13px; font-weight: 500; font-family: 'DM Mono', monospace; }
+  .ch-bar-wrap { width: 80px; height: 4px; background: var(--border); border-radius: 2px; }
+  .ch-bar { height: 4px; border-radius: 2px; }
+
+  .upcoming-item {
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px; cursor: pointer;
+  }
+  .upcoming-item:last-child { border-bottom: none; }
+  .upcoming-item:hover .up-name { color: var(--accent); }
+  .up-date { font-size: 11px; font-family: 'DM Mono', monospace; color: var(--muted); width: 80px; flex-shrink: 0; }
+  .up-name { font-size: 13px; flex: 1; }
+  .up-time { font-size: 11px; font-family: 'DM Mono', monospace; color: var(--muted); }
+
+  /* ── CHIPS / BADGES ── */
+  .chip {
+    display: inline-block; padding: 3px 8px;
+    border-radius: 4px; font-size: 11px; font-weight: 500;
+  }
+  .chip-raftar        { background: var(--raftar-bg);   color: var(--raftar); }
+  .chip-sports        { background: var(--sports-bg);   color: var(--sports); }
+  .chip-cuts          { background: var(--cuts-bg);     color: var(--cuts); }
+  .chip-now           { background: var(--now-bg);      color: var(--now); }
+  .chip-momkast       { background: var(--momkast-bg);  color: var(--momkast); }
+  .chip-fire          { background: var(--fire-bg);     color: var(--fire); }
+  .chip-confirmed     { background: #0D2E1F; color: var(--confirmed); }
+  .chip-tentative     { background: #2E1F08; color: var(--tentative); }
+  .chip-cancelled     { background: #2E0D0D; color: var(--cancelled); }
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.7);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 200; opacity: 0; pointer-events: none; transition: opacity .2s;
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 28px; width: 520px; max-width: 95vw;
+    transform: translateY(16px); transition: transform .2s;
+    max-height: 90vh; overflow-y: auto;
+  }
+  .modal-overlay.open .modal { transform: translateY(0); }
+  .modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 24px;
+  }
+  .modal-header h2 { font-size: 17px; font-weight: 500; }
+  .modal-close {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: var(--card); border: 1px solid var(--border);
+    color: var(--text); font-size: 18px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+  .form-row.full { grid-template-columns: 1fr; }
+  .form-row.three { grid-template-columns: 1fr 1fr 1fr; }
+  .form-group label {
+    display: block; font-size: 11px; font-weight: 500;
+    text-transform: uppercase; letter-spacing: .06em;
+    color: var(--muted); margin-bottom: 6px;
+  }
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    width: 100%; padding: 9px 12px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); color: var(--text);
+    font-family: 'DM Sans', sans-serif; font-size: 13px;
+    outline: none; transition: border-color .15s;
+  }
+  .form-group input:focus,
+  .form-group select:focus,
+  .form-group textarea:focus { border-color: var(--accent); }
+  .form-group textarea { resize: vertical; min-height: 72px; }
+  .form-group select option { background: var(--card); }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+  .btn-cancel {
+    padding: 9px 18px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); background: transparent;
+    color: var(--muted); font-family: 'DM Sans', sans-serif;
+    font-size: 13px; cursor: pointer;
+  }
+  .btn-save {
+    padding: 9px 24px; border-radius: var(--radius-sm);
+    border: none; background: var(--accent);
+    color: #000; font-family: 'DM Sans', sans-serif;
+    font-weight: 600; font-size: 13px; cursor: pointer;
+    transition: opacity .15s;
+  }
+  .btn-save:hover { opacity: .88; }
+  .btn-delete {
+    padding: 9px 18px; border-radius: var(--radius-sm);
+    border: 1px solid var(--cancelled); background: transparent;
+    color: var(--cancelled); font-family: 'DM Sans', sans-serif;
+    font-size: 13px; cursor: pointer; margin-right: auto;
+  }
+
+  /* ── DETAIL MODAL ── */
+  .detail-field { margin-bottom: 14px; }
+  .detail-label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 3px; }
+  .detail-value { font-size: 14px; }
+
+  /* ── EMPTY ── */
+  .empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .empty-icon { font-size: 32px; margin-bottom: 12px; }
+
+  .dup-warning {
+    display: none; background: #2E1F08; border: 1px solid var(--tentative);
+    border-radius: var(--radius-sm); padding: 8px 12px;
+    color: var(--tentative); font-size: 12px; margin-bottom: 12px;
+  }
+</style>
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="auth-screen">
+  <div class="auth-box">
+    <div class="auth-logo">Raftar Media</div>
+    <h2>Shoot Schedule</h2>
+    <p>Enter password to continue</p>
+    <input type="password" id="pw-input" placeholder="••••••••" onkeydown="if(event.key==='Enter')tryLogin()">
+    <button onclick="tryLogin()">Enter</button>
+    <div class="auth-error" id="auth-error">Incorrect password</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <header>
+    <div class="logo">Raftar <span>/ Shoots</span></div>
+    <nav>
+      <button class="active" onclick="switchView('calendar',this)">Calendar</button>
+      <button onclick="switchView('list',this)">All Shoots</button>
+      <button onclick="switchView('dashboard',this)">Dashboard</button>
+    </nav>
+    <button class="btn-new" onclick="openForm()">+ New Shoot</button>
+  </header>
+
+  <main>
+    <!-- CALENDAR VIEW -->
+    <div class="view active" id="view-calendar">
+      <div class="cal-header">
+        <div class="cal-nav">
+          <button onclick="calNav(-1)">‹</button>
+          <button onclick="calNav(1)">›</button>
+        </div>
+        <div class="cal-title" id="cal-title"></div>
+        <button onclick="calToday()" style="padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--subtle);font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;">Today</button>
+        <div class="cal-mode">
+          <button class="active" id="mode-week" onclick="setCalMode('week',this)">Week</button>
+          <button id="mode-month" onclick="setCalMode('month',this)">Month</button>
+        </div>
+      </div>
+      <div id="cal-body"></div>
+    </div>
+
+    <!-- LIST VIEW -->
+    <div class="view" id="view-list">
+      <div class="list-filters">
+        <input class="search-input" id="search" placeholder="Search person, project, details…" oninput="renderList()">
+        <select class="filter-select" id="f-channel" onchange="renderList()">
+          <option value="">All Channels</option>
+          <option>Raftar</option><option>Raftar Sports</option>
+          <option>Raftar Cuts</option><option>Raftar Now</option>
+          <option>MomKast</option><option>Firestarter</option>
+        </select>
+        <select class="filter-select" id="f-status" onchange="renderList()">
+          <option value="">All Statuses</option>
+          <option>Confirmed</option><option>Tentative</option><option>Cancelled</option>
+        </select>
+        <select class="filter-select" id="f-type" onchange="renderList()">
+          <option value="">All Types</option>
+          <option>Podcast</option><option>Documentary</option><option>SOT</option>
+          <option>Short-form</option><option>Corporate</option><option>Shoot</option>
+        </select>
+        <select class="filter-select" id="f-time" onchange="renderList()">
+          <option value="">All Time</option>
+          <option value="upcoming">Upcoming</option>
+          <option value="past">Past</option>
+        </select>
+      </div>
+      <table class="shoot-table">
+        <thead>
+          <tr>
+            <th>Date</th><th>Time</th><th>Person / Project</th>
+            <th>Channel</th><th>Type</th><th>Location</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="list-body"></tbody>
+      </table>
+    </div>
+
+    <!-- DASHBOARD VIEW -->
+    <div class="view" id="view-dashboard">
+      <div class="stats-grid" id="stats-grid"></div>
+      <div class="dash-grid">
+        <div class="dash-card">
+          <h3>By Channel</h3>
+          <div id="dash-channels"></div>
+        </div>
+        <div class="dash-card">
+          <h3>Next 10 Upcoming</h3>
+          <div id="dash-upcoming"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- NEW / EDIT FORM MODAL -->
+<div class="modal-overlay" id="form-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="form-title">New Shoot</h2>
+      <button class="modal-close" onclick="closeModal('form-modal')">×</button>
+    </div>
+    <div class="dup-warning" id="dup-warning">
+      ⚠ A shoot with this date and person already exists — check before saving.
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Date</label>
+        <input type="date" id="f-date" oninput="checkDuplicate()">
+      </div>
+      <div class="form-group">
+        <label>Channel</label>
+        <select id="f-ch">
+          <option value="">Select…</option>
+          <option>Raftar</option><option>Raftar Sports</option>
+          <option>Raftar Cuts</option><option>Raftar Now</option>
+          <option>MomKast</option><option>Firestarter</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row three">
+      <div class="form-group">
+        <label>From</label>
+        <input type="time" id="f-from">
+      </div>
+      <div class="form-group">
+        <label>To</label>
+        <input type="time" id="f-to">
+      </div>
+      <div class="form-group">
+        <label>Location</label>
+        <select id="f-loc">
+          <option value="">Select…</option>
+          <option>Studio</option><option>Outdoor</option>
+          <option>Indoor</option><option>Studio + Outdoor</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Person / Project</label>
+        <input type="text" id="f-person" placeholder="e.g. Mahnoor — Vape Documentary" oninput="checkDuplicate()">
+      </div>
+      <div class="form-group">
+        <label>Type</label>
+        <select id="f-type">
+          <option value="">Select…</option>
+          <option>Podcast</option><option>Documentary</option><option>SOT</option>
+          <option>Short-form</option><option>Corporate</option><option>Shoot</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row full">
+      <div class="form-group">
+        <label>Details &amp; Setup Notes</label>
+        <textarea id="f-details" placeholder="Guest name, camera setup, special requirements…"></textarea>
+      </div>
+    </div>
+    <div class="form-row full">
+      <div class="form-group">
+        <label>Status</label>
+        <select id="f-status">
+          <option>Confirmed</option><option>Tentative</option><option>Cancelled</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-delete" id="btn-delete" style="display:none" onclick="deleteShoot()">Delete</button>
+      <button class="btn-cancel" onclick="closeModal('form-modal')">Cancel</button>
+      <button class="btn-save" onclick="saveShoot()">Save Shoot</button>
+    </div>
+  </div>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="modal-overlay" id="detail-modal">
+  <div class="modal" style="width:420px">
+    <div class="modal-header">
+      <h2 id="detail-title">Shoot Details</h2>
+      <button class="modal-close" onclick="closeModal('detail-modal')">×</button>
+    </div>
+    <div id="detail-body"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('detail-modal')">Close</button>
+      <button class="btn-save" onclick="editFromDetail()">Edit</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── FIREBASE ──────────────────────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyDemo",
+  databaseURL: "https://content-pipeline-e542b-default-rtdb.firebaseio.com"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const SHOOTS_REF = db.ref('shoots');
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let shoots = {};
+let calDate = new Date();
+let calMode = 'week';
+let editingId = null;
+let detailId = null;
+
+const TODAY = new Date();
+TODAY.setHours(0,0,0,0);
+
+// ── AUTH ──────────────────────────────────────────────────────────────────────
+function tryLogin() {
+  const pw = document.getElementById('pw-input').value;
+  db.ref('config/password').once('value').then(snap => {
+    if (pw === snap.val()) {
+      sessionStorage.setItem('shoot_auth_v1', 'true');
+      document.getElementById('auth-screen').style.display = 'none';
+      document.getElementById('app').style.display = 'flex';
+      initApp();
+    } else {
+      document.getElementById('auth-error').style.display = 'block';
+    }
+  });
+}
+
+if (sessionStorage.getItem('shoot_auth_v1')) {
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  initApp();
+}
+
+function initApp() {
+  SHOOTS_REF.on('value', snap => {
+    shoots = snap.val() || {};
+    renderAll();
+  });
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+function renderAll() {
+  renderCalendar();
+  renderList();
+  renderDashboard();
+}
+
+// ── CHANNEL HELPERS ───────────────────────────────────────────────────────────
+const CH_CLASS = {
+  'Raftar':'raftar','Raftar Sports':'sports','Raftar Cuts':'cuts',
+  'Raftar Now':'now','MomKast':'momkast','Firestarter':'fire'
+};
+const CH_COLOR = {
+  'Raftar':'#3B82F6','Raftar Sports':'#F59E0B','Raftar Cuts':'#10B981',
+  'Raftar Now':'#8B5CF6','MomKast':'#EC4899','Firestarter':'#EF4444'
+};
+
+function chipHtml(val, type) {
+  if (!val) return '';
+  if (type === 'channel') {
+    const cls = CH_CLASS[val] || 'raftar';
+    return `<span class="chip chip-${cls}">${val}</span>`;
+  }
+  const cls = val.toLowerCase();
+  return `<span class="chip chip-${cls}">${val}</span>`;
+}
+
+function sortedShoots() {
+  return Object.entries(shoots)
+    .map(([id,s]) => ({id,...s}))
+    .sort((a,b) => (a.date+a.from) > (b.date+b.from) ? 1 : -1);
+}
+
+// ── CALENDAR ──────────────────────────────────────────────────────────────────
+function renderCalendar() {
+  if (calMode === 'week') renderWeek();
+  else renderMonth();
+}
+
+function getWeekStart(d) {
+  const s = new Date(d);
+  const day = s.getDay();
+  s.setDate(s.getDate() - day + (day === 0 ? -6 : 1));
+  s.setHours(0,0,0,0);
+  return s;
+}
+
+function fmt(d) {
+  return d.toISOString().split('T')[0];
+}
+
+function renderWeek() {
+  const ws = getWeekStart(calDate);
+  const days = Array.from({length:7}, (_,i) => {
+    const d = new Date(ws); d.setDate(d.getDate()+i); return d;
+  });
+
+  const months = [...new Set(days.map(d => d.toLocaleString('en',{month:'long'})))];
+  const yr = ws.getFullYear();
+  document.getElementById('cal-title').textContent =
+    months.join(' / ') + ' ' + yr;
+
+  const hours = Array.from({length:16}, (_,i) => i+7); // 07:00–22:00
+
+  let html = `<div class="week-grid">`;
+  // corner
+  html += `<div class="week-time-col" style="border-bottom:1px solid var(--border);padding:12px 0"></div>`;
+  // day headers
+  days.forEach(d => {
+    const isToday = fmt(d) === fmt(TODAY);
+    html += `<div class="week-day-header${isToday?' today':''}">
+      <span class="date-num">${d.getDate()}</span>
+      <span class="day-name">${d.toLocaleString('en',{weekday:'short'})}</span>
+    </div>`;
+  });
+
+  // time slots
+  hours.forEach(h => {
+    html += `<div class="week-time-col"><div class="week-time-slot">${h}:00</div></div>`;
+    days.forEach(d => {
+      const dateStr = fmt(d);
+      const dayShots = Object.entries(shoots)
+        .filter(([,s]) => s.date === dateStr)
+        .map(([id,s]) => ({id,...s}));
+
+      let cellContent = '';
+      dayShots.forEach(s => {
+        const sh = s.from ? parseInt(s.from.split(':')[0]) : null;
+        if (sh === h) {
+          const col = CH_COLOR[s.channel] || '#64748B';
+          const dur = getDurPx(s.from, s.to);
+          cellContent += `<div onclick="showDetail('${s.id}')" style="
+            position:absolute;left:3px;right:3px;
+            background:${col}22;border-left:3px solid ${col};
+            border-radius:4px;padding:3px 6px;font-size:11px;
+            cursor:pointer;z-index:2;height:${dur}px;min-height:20px;overflow:hidden;
+            top:0;
+          " title="${s.person}">
+            <div style="font-weight:500;color:${col};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.person||''}</div>
+            ${s.from?`<div style="color:var(--muted)">${s.from}${s.to?'–'+s.to:''}</div>`:''}
+          </div>`;
+        }
+      });
+
+      html += `<div class="week-cell" onclick="openFormOnDate('${dateStr}',${h})">${cellContent}</div>`;
+    });
+  });
+  html += '</div>';
+  document.getElementById('cal-body').innerHTML = html;
+}
+
+function getDurPx(from, to) {
+  if (!from || !to) return 54;
+  const [fh,fm] = from.split(':').map(Number);
+  const [th,tm] = to.split(':').map(Number);
+  const mins = (th*60+tm) - (fh*60+fm);
+  return Math.max(20, Math.min(mins, 240));
+}
+
+function renderMonth() {
+  const yr = calDate.getFullYear();
+  const mo = calDate.getMonth();
+  document.getElementById('cal-title').textContent =
+    calDate.toLocaleString('en',{month:'long',year:'numeric'});
+
+  const first = new Date(yr,mo,1);
+  const last  = new Date(yr,mo+1,0);
+  let startDay = first.getDay(); if(startDay===0) startDay=7;
+
+  const cells = [];
+  for(let i=1;i<startDay;i++) {
+    const d=new Date(yr,mo,1-startDay+i); cells.push({d,other:true});
+  }
+  for(let i=1;i<=last.getDate();i++) cells.push({d:new Date(yr,mo,i),other:false});
+  while(cells.length%7!==0) {
+    const d=new Date(yr,mo+1,cells.length-last.getDate()-startDay+2);
+    cells.push({d,other:true});
+  }
+
+  let html = `<div class="month-grid">`;
+  ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach(d =>
+    html += `<div class="month-day-name">${d}</div>`);
+
+  cells.forEach(({d,other}) => {
+    const dateStr = fmt(d);
+    const isToday = dateStr===fmt(TODAY);
+    const dayShots = Object.entries(shoots)
+      .filter(([,s])=>s.date===dateStr).map(([id,s])=>({id,...s}));
+    const show = dayShots.slice(0,3);
+    const more = dayShots.length-3;
+
+    html += `<div class="month-cell${other?' other-month':''}${isToday?' today':''}" onclick="openFormOnDate('${dateStr}')">
+      <div class="cell-date">${d.getDate()}</div>`;
+    show.forEach(s => {
+      const col = CH_COLOR[s.channel]||'#64748B';
+      html += `<div class="shoot-pill" style="background:${col}22;color:${col}"
+        onclick="event.stopPropagation();showDetail('${s.id}')">${s.person||'Shoot'}</div>`;
+    });
+    if(more>0) html+=`<div class="more-pill">+${more} more</div>`;
+    html += '</div>';
+  });
+  html += '</div>';
+  document.getElementById('cal-body').innerHTML = html;
+}
+
+function calNav(dir) {
+  if(calMode==='week') calDate.setDate(calDate.getDate()+dir*7);
+  else { calDate.setMonth(calDate.getMonth()+dir); }
+  renderCalendar();
+}
+function calToday() { calDate=new Date(); renderCalendar(); }
+function setCalMode(m,btn) {
+  calMode=m;
+  document.querySelectorAll('.cal-mode button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderCalendar();
+}
+
+// ── LIST VIEW ─────────────────────────────────────────────────────────────────
+function renderList() {
+  const search  = (document.getElementById('search')?.value||'').toLowerCase();
+  const fCh     = document.getElementById('f-channel')?.value||'';
+  const fSt     = document.getElementById('f-status')?.value||'';
+  const fTp     = document.getElementById('f-type')?.value||'';
+  const fTime   = document.getElementById('f-time')?.value||'';
+  const todayStr= fmt(TODAY);
+
+  let list = sortedShoots().filter(s => {
+    if(fCh && s.channel!==fCh) return false;
+    if(fSt && s.status!==fSt) return false;
+    if(fTp && s.type!==fTp) return false;
+    if(fTime==='upcoming' && s.date<=todayStr) return false;
+    if(fTime==='past' && s.date>todayStr) return false;
+    if(search) {
+      const hay = `${s.person} ${s.details} ${s.channel} ${s.type}`.toLowerCase();
+      if(!hay.includes(search)) return false;
+    }
+    return true;
+  });
+
+  const tbody = document.getElementById('list-body');
+  if(!tbody) return;
+  if(!list.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--muted)">No shoots found</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = list.map(s => {
+    const past = s.date < todayStr;
+    return `<tr class="${past?'past':''}" onclick="showDetail('${s.id}')">
+      <td style="font-family:'DM Mono',monospace;font-size:12px">${s.date||''}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted)">${s.from||''}${s.to?'–'+s.to:''}</td>
+      <td style="font-weight:500">${s.person||''}</td>
+      <td>${chipHtml(s.channel,'channel')}</td>
+      <td style="color:var(--muted);font-size:12px">${s.type||''}</td>
+      <td style="color:var(--muted);font-size:12px">${s.location||''}</td>
+      <td>${chipHtml(s.status,'status')}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────────────────────
+function renderDashboard() {
+  const all = sortedShoots();
+  const todayStr = fmt(TODAY);
+  const upcoming = all.filter(s=>s.date>=todayStr);
+  const past     = all.filter(s=>s.date<todayStr);
+  const confirmed= all.filter(s=>s.status==='Confirmed');
+  const tentative= all.filter(s=>s.status==='Tentative');
+  const cancelled= all.filter(s=>s.status==='Cancelled');
+
+  document.getElementById('stats-grid').innerHTML = [
+    ['Total Shoots', all.length, '#3B82F6'],
+    ['Upcoming',     upcoming.length, '#10B981'],
+    ['Completed',    past.length, '#8B5CF6'],
+    ['Confirmed',    confirmed.length, '#10B981'],
+    ['Tentative',    tentative.length, '#F59E0B'],
+    ['Cancelled',    cancelled.length, '#EF4444'],
+  ].map(([label,val,col]) => `
+    <div class="stat-card">
+      <div class="stat-label">${label}</div>
+      <div class="stat-value" style="color:${col}">${val}</div>
+    </div>`).join('');
+
+  const channels = ['Raftar','Raftar Sports','Raftar Cuts','Raftar Now','MomKast','Firestarter'];
+  const maxCh = Math.max(...channels.map(ch=>all.filter(s=>s.channel===ch).length),1);
+  document.getElementById('dash-channels').innerHTML = channels.map(ch => {
+    const count = all.filter(s=>s.channel===ch).length;
+    const col = CH_COLOR[ch]||'#64748B';
+    const pct = Math.round(count/maxCh*100);
+    return `<div class="channel-row">
+      <div class="ch-dot" style="background:${col}"></div>
+      <div class="ch-name">${ch}</div>
+      <div class="ch-bar-wrap"><div class="ch-bar" style="width:${pct}%;background:${col}"></div></div>
+      <div class="ch-count">${count}</div>
+    </div>`;
+  }).join('');
+
+  const next10 = upcoming.slice(0,10);
+  document.getElementById('dash-upcoming').innerHTML = next10.length
+    ? next10.map(s => `
+      <div class="upcoming-item" onclick="showDetail('${s.id}')">
+        <div class="up-date">${s.date}</div>
+        <div class="up-name">${s.person||'—'}</div>
+        <div class="up-time">${s.from||''}</div>
+        ${chipHtml(s.channel,'channel')}
+      </div>`).join('')
+    : '<div style="color:var(--muted);font-size:13px;padding:16px 0">No upcoming shoots</div>';
+}
+
+// ── FORM ──────────────────────────────────────────────────────────────────────
+function openForm(id=null, prefillDate=null, prefillHour=null) {
+  editingId = id;
+  document.getElementById('form-title').textContent = id ? 'Edit Shoot' : 'New Shoot';
+  document.getElementById('btn-delete').style.display = id ? 'block' : 'none';
+  document.getElementById('dup-warning').style.display = 'none';
+
+  if(id && shoots[id]) {
+    const s=shoots[id];
+    document.getElementById('f-date').value   = s.date||'';
+    document.getElementById('f-ch').value     = s.channel||'';
+    document.getElementById('f-from').value   = s.from||'';
+    document.getElementById('f-to').value     = s.to||'';
+    document.getElementById('f-loc').value    = s.location||'';
+    document.getElementById('f-person').value = s.person||'';
+    document.getElementById('f-type').value   = s.type||'';
+    document.getElementById('f-details').value= s.details||'';
+    document.getElementById('f-status').value = s.status||'Confirmed';
+  } else {
+    document.getElementById('f-date').value   = prefillDate||'';
+    document.getElementById('f-ch').value     = '';
+    document.getElementById('f-from').value   = prefillHour ? `${String(prefillHour).padStart(2,'0')}:00` : '';
+    document.getElementById('f-to').value     = '';
+    document.getElementById('f-loc').value    = '';
+    document.getElementById('f-person').value = '';
+    document.getElementById('f-type').value   = '';
+    document.getElementById('f-details').value= '';
+    document.getElementById('f-status').value = 'Confirmed';
+  }
+  openModal('form-modal');
+}
+
+function openFormOnDate(dateStr, hour=null) {
+  openForm(null, dateStr, hour);
+}
+
+function checkDuplicate() {
+  const date   = document.getElementById('f-date').value;
+  const person = document.getElementById('f-person').value.trim().toLowerCase();
+  if(!date || !person) { document.getElementById('dup-warning').style.display='none'; return; }
+  const dup = Object.entries(shoots).some(([id,s]) =>
+    s.date===date &&
+    (s.person||'').toLowerCase()===person &&
+    id !== editingId
+  );
+  document.getElementById('dup-warning').style.display = dup ? 'block' : 'none';
+}
+
+function saveShoot() {
+  const data = {
+    date:     document.getElementById('f-date').value,
+    channel:  document.getElementById('f-ch').value,
+    from:     document.getElementById('f-from').value,
+    to:       document.getElementById('f-to').value,
+    location: document.getElementById('f-loc').value,
+    person:   document.getElementById('f-person').value.trim(),
+    type:     document.getElementById('f-type').value,
+    details:  document.getElementById('f-details').value.trim(),
+    status:   document.getElementById('f-status').value,
+    updatedAt: Date.now()
+  };
+  if(!data.date || !data.person) { alert('Date and Person / Project are required.'); return; }
+
+  if(editingId) {
+    SHOOTS_REF.child(editingId).update(data);
+  } else {
+    data.createdAt = Date.now();
+    SHOOTS_REF.push(data);
+  }
+  closeModal('form-modal');
+}
+
+function deleteShoot() {
+  if(!editingId) return;
+  if(!confirm('Delete this shoot? This cannot be undone.')) return;
+  SHOOTS_REF.child(editingId).remove();
+  closeModal('form-modal');
+  closeModal('detail-modal');
+}
+
+// ── DETAIL ────────────────────────────────────────────────────────────────────
+function showDetail(id) {
+  detailId = id;
+  const s = shoots[id];
+  if(!s) return;
+  document.getElementById('detail-title').textContent = s.person || 'Shoot';
+  document.getElementById('detail-body').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div class="detail-field"><div class="detail-label">Date</div><div class="detail-value" style="font-family:'DM Mono',monospace">${s.date||'—'}</div></div>
+      <div class="detail-field"><div class="detail-label">Time</div><div class="detail-value" style="font-family:'DM Mono',monospace">${s.from||'—'}${s.to?' – '+s.to:''}</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div class="detail-field"><div class="detail-label">Channel</div><div>${chipHtml(s.channel,'channel')}</div></div>
+      <div class="detail-field"><div class="detail-label">Status</div><div>${chipHtml(s.status,'status')}</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div class="detail-field"><div class="detail-label">Type</div><div class="detail-value">${s.type||'—'}</div></div>
+      <div class="detail-field"><div class="detail-label">Location</div><div class="detail-value">${s.location||'—'}</div></div>
+    </div>
+    ${s.details?`<div class="detail-field"><div class="detail-label">Details</div><div class="detail-value" style="color:var(--subtle);line-height:1.6">${s.details}</div></div>`:''}
+  `;
+  openModal('detail-modal');
+}
+
+function editFromDetail() {
+  closeModal('detail-modal');
+  openForm(detailId);
+}
+
+// ── MODAL UTILS ───────────────────────────────────────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(el =>
+  el.addEventListener('click', e => { if(e.target===el) el.classList.remove('open'); })
+);
+
+// ── VIEW SWITCHER ─────────────────────────────────────────────────────────────
+function switchView(name, btn) {
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  btn.classList.add('active');
+  if(name==='list') renderList();
+  if(name==='dashboard') renderDashboard();
+}
+</script>
+</body>
+</html>
